@@ -1,9 +1,16 @@
 ---
-- name: Update APT
+- name: Update APT with Proxy
   hosts: all
   become: true
 
   tasks:
+    - name: Set APT proxy
+      become: true
+      lineinfile:
+        path: /etc/apt/apt.conf.d/01proxy
+        line: 'Acquire::http::Proxy "http://192.168.0.95:3142";'
+        create: yes
+
     - name: Update APT cache
       apt:
         update_cache: yes
