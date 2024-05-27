@@ -1,25 +1,29 @@
----
-- name: Update APT with Proxy
-  hosts: all
-  become: true
+- hosts: "{{ hosts }}"
 
+  become: yes
   tasks:
-    - name: Set APT proxy
+    # Upgrade packages
+    - name: upgrade apt packages
       become: true
-      lineinfile:
-        path: /etc/apt/apt.conf.d/01proxy
-        line: 'Acquire::http::Proxy "http://192.168.0.95:3142";'
-        create: yes
-
-    - name: Update APT cache
-      apt:
-        update_cache: yes
-
-    - name: Upgrade packages
       apt:
         upgrade: yes
+        update_cache: yes
 
-    - name: Clean up APT cache
-      apt:
-        autoclean: yes
-        autoremove: yes
+    # Check if reboot is required
+    - name: check if system reboot is required
+      become: true
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    # Send Discord message when reboot is required
+    - name: Send Discord message
+      uri:
+        url: "{{ discord_webhook_url }}"
+        method: POST
+        body_format: json
+        body: '{"content": "Reboot required on {{ inventory_hostname }}"}'
+        headers:
+          Content-Type: application/json
+        status_code: 204
+      when: reboot_required.stat.exists
