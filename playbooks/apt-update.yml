@@ -3,12 +3,42 @@
 
   become: yes
   tasks:
-    # Upgrade packages
+    # Update apt cache and get the list of upgradable packages
+    - name: update apt cache and list upgradable packages
+      become: true
+      command: apt-get update -qq && apt-get -s upgrade
+      register: apt_output
+
+    # Upgrade apt packages
     - name: upgrade apt packages
       become: true
       apt:
         upgrade: yes
         update_cache: yes
+
+    # Extract the list of updated packages from the apt output
+    - name: extract updated packages list
+      set_fact:
+        updated_packages: |
+          {% set packages = [] %}
+          {% for line in apt_output.stdout_lines %}
+            {% if line.startswith("Inst ") %}
+              {% set pkg = line.split()[1] %}
+              {% set packages = packages + [pkg] %}
+            {% endif %}
+          {% endfor %}
+          {{ packages | join(', ') }}
+
+    # Send Discord message with the list of updated packages
+    - name: Send Discord message for updated packages
+      uri:
+        url: "{{ discord_webhook_url }}"
+        method: POST
+        body_format: json
+        body: '{"content": "Updated packages on {{ inventory_hostname }}: {{ updated_packages }}"}'
+        headers:
+          Content-Type: application/json
+        status_code: 204
 
     # Check if reboot is required
     - name: check if system reboot is required
@@ -18,7 +48,7 @@
       register: reboot_required
 
     # Send Discord message when reboot is required
-    - name: Send Discord message
+    - name: Send Discord message for reboot
       uri:
         url: "{{ discord_webhook_url }}"
         method: POST
